@@ -159,7 +159,73 @@ En [litellm_config.yaml](file:///C:/Users/cesar/Documents/ai-tools-export/genai-
   - `gpt-4o-mini` (mapeado a `openai/gpt-4o-mini`, requiere `OPENAI_API_KEY`)
   - `gpt-4o` (mapeado a `openai/gpt-4o`, requiere `OPENAI_API_KEY`)
 
-### 4.2 Cómo cambiar el modelo de un Agente
+### 4.2 ¿Cuándo usar cada modelo?
+
+| Modelo | Cuándo usarlo | Contra |
+|--------|--------------|--------|
+| `llama3` | Datos sensibles o privados. Sin costo. Sin internet. | Lento en hardware modesto. No soporta tool calling confiablemente. |
+| `nomic-embed-text` | Embeddings para RAG. Siempre local. | Solo sirve para embeddings, no para chat. |
+| `gemini-flash` | Tool calling, respuestas rápidas, free tier generoso (1000 req/día). | Los datos salen de tu máquina hacia Google. |
+| `gpt-4o-mini` | Calidad alta, precio bajo. Buena opción para pruebas cloud. | Los datos salen hacia OpenAI. Tiene costo por token. |
+| `gpt-4o` | Máxima capacidad de razonamiento. | Más caro. Reservalo para casos complejos. |
+
+**Regla práctica:**
+- ¿Los datos son sensibles o internos? → `llama3` (local)
+- ¿Necesitás tool calling confiable? → `gemini-flash`
+- ¿Querés calidad cloud sin gastar mucho? → `gpt-4o-mini`
+
+### 4.3 Cómo cambiar el modelo de un Agente — paso a paso completo
+
+Ejemplo concreto: **cambiar `diagnosis-agent` de `llama3` a `gpt-4o-mini`**.
+
+**Paso 1 — Verificar que el alias existe en `litellm_config.yaml`**
+
+```yaml
+# Ya debe estar declarado:
+- model_name: gpt-4o-mini
+  litellm_params:
+    model: openai/gpt-4o-mini
+    api_key: "os.environ/OPENAI_API_KEY"
+```
+Si no está, agregalo. Después de modificar este archivo necesitás recrear el contenedor de LiteLLM.
+
+**Paso 2 — Verificar que tenés la API key en `.env`**
+
+```
+OPENAI_API_KEY=sk-proj-...
+```
+Sin esto, LiteLLM va a fallar cuando intente llamar a OpenAI.
+
+**Paso 3 — Actualizar `docker-compose.yaml`**
+
+```yaml
+diagnosis-agent:
+  environment:
+    - SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL=gpt-4o-mini  # ← este valor debe coincidir exactamente con model_name en litellm_config.yaml
+```
+
+**Paso 4 — Redesplegar los contenedores afectados**
+
+```bash
+# Si modificaste litellm_config.yaml:
+docker compose up -d --force-recreate litellm
+
+# Reiniciá el agente:
+docker compose up -d --force-recreate diagnosis-agent
+```
+
+**Paso 5 — Verificar**
+
+```bash
+curl -X POST http://localhost:8081/api/v1/diagnose \
+  -H "Content-Type: application/json" \
+  -d "{\"log\": \"java.lang.NullPointerException at com.example.Service:42\"}"
+```
+Si la respuesta tiene `rootCause`, el modelo nuevo está funcionando.
+
+> **Error frecuente:** si el nombre en `SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL` no coincide exactamente con el `model_name` en `litellm_config.yaml`, el agente va a fallar con un error de modelo no encontrado. Los nombres son case-sensitive.
+
+### 4.4 Cómo cambiar el modelo de un Agente
 
 Para cambiar el LLM de un agente Java, tenés dos enfoques:
 
