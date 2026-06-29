@@ -1,13 +1,13 @@
-# Setup and Initialization Guide (WSL / Linux)
+# Guía de Configuración e Inicialización (WSL / Linux)
 
-This guide walks you through setting up and running the Generative AI multi-agent stack on a new machine using Windows Subsystem for Linux (WSL) or a native Linux environment.
+Esta guía te guiará en los pasos para configurar y ejecutar el stack multi-agente de IA Generativa en una nueva máquina usando Windows Subsystem for Linux (WSL) o un entorno Linux nativo.
 
-## Prerequisites
+## Requisitos Previos
 
-Ensure the following tools are installed on your WSL instance / host system:
+Asegurate de tener instaladas las siguientes herramientas en tu instancia de WSL o sistema host:
 
 1. **Docker & Docker Compose**: 
-   - If using Windows, install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and enable **WSL 2 Integration** under `Settings > Resources > WSL Integration`.
+   - Si usás Windows, instalá [Docker Desktop](https://www.docker.com/products/docker-desktop/) y habilitá **WSL 2 Integration** en `Settings > Resources > WSL Integration`.
 2. **Java Development Kit (JDK) 21**:
    ```bash
    sudo apt update
@@ -18,84 +18,84 @@ Ensure the following tools are installed on your WSL instance / host system:
    sudo apt install maven
    ```
 4. **Git**:
-   - Make sure your SSH keys or HTTPS credentials are configured.
+   - Asegurate de tener configuradas tus claves SSH o credenciales HTTPS para clonar el repositorio.
 
-## Step 1: Clone the Repository
+## Paso 1: Clonar el Repositorio
 
-Clone the project to your WSL home directory (do not clone it to `/mnt/c/...` for performance and file permission reasons):
+Cloná el proyecto en el directorio home de tu WSL (no lo clones dentro de `/mnt/c/...` por cuestiones de rendimiento y permisos de archivos de Linux):
 
 ```bash
-git clone <your-repo-url>
+git clone <url-de-tu-repo>
 cd genai-stack
 ```
 
-## Step 2: Environment Configuration
+## Paso 2: Configuración del Entorno
 
-The repository uses environment variables for API keys and secrets. 
+El repositorio utiliza variables de entorno para las API keys y secretos.
 
-1. Copy the template to create your local `.env` file (which is ignored by Git):
+1. Copiá la plantilla para crear tu archivo local `.env` (el cual está ignorado en Git):
    ```bash
    cp .env.template .env
    ```
-2. Open `.env` and fill in your keys (e.g., `GEMINI_API_KEY`, `LANGFUSE_` keys, etc.):
+2. Abrí el archivo `.env` e ingresá tus claves reales (por ejemplo, `GEMINI_API_KEY`, las claves de `LANGFUSE_`, etc.):
    ```bash
    nano .env
    ```
 
-## Step 3: Build the Java Agents
+## Paso 3: Compilar los Agentes Java
 
-Before running the containers, compile all Java agents to generate the JAR files required by the Docker builds:
+Antes de levantar los contenedores, tenés que compilar todos los agentes Java para generar los archivos JAR requeridos por los builds de Docker:
 
 ```bash
 mvn clean package -DskipTests
 ```
 
-This compiles:
+Esto compilará:
 - `doc-query-agent`
 - `diagnosis-agent`
 - `smart-search-agent`
 - `orchestrator-agent`
 
-## Step 4: Launch the Services
+## Paso 4: Levantar los Servicios
 
-Start all services in detached mode using Docker Compose:
+Iniciá todos los servicios en segundo plano usando Docker Compose:
 
 ```bash
 docker compose --env-file .env up -d --build
 ```
 
-Verify that all containers are up and healthy:
+Verificá que todos los contenedores estén corriendo y saludables:
 ```bash
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
-## Step 5: Model Pulling (Ollama)
+## Paso 5: Descargar Modelos (Ollama)
 
-Since vector databases and Ollama data volumes are local to each Docker host, you need to download the models in the new environment.
+Dado que las bases de datos vectoriales y los volúmenes de datos de Ollama son locales de cada host de Docker, vas a necesitar descargar los modelos en el nuevo entorno.
 
-Execute the following commands to pull the required LLM and Embedding models:
+Ejecutá los siguientes comandos para descargar el LLM y el modelo de embeddings necesarios:
 
 ```bash
-# Pull LLM
+# Descargar el LLM
 docker exec -it ollama ollama pull llama3.2:3b
 
-# Pull Embedding model (used for doc-query RAG)
+# Descargar el modelo de embeddings (usado para el RAG de doc-query)
 docker exec -it ollama ollama pull nomic-embed-text
 ```
 
-## Step 6: Ingest Initial Documents
+## Paso 6: Ingestar Documentos Iniciales
 
-For the `doc-query-agent` (and consequently `smart-search` and `orchestrator`) to search documentation, you must ingest the files in the `./docs` folder into Qdrant:
+Para que el agente de consulta de documentos (`doc-query-agent`) y los demás agentes downstream puedan realizar búsquedas en la documentación, tenés que ingestar los archivos de la carpeta `./docs` en Qdrant:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/ingest
 ```
 
-Expected response:
+Respuesta esperada:
 ```json
 {"filesProcessed": 1, "chunksLoaded": 42}
 ```
 
-## Verification
+## Verificación
 
-Refer to [USAGE.md](file:///C:/Users/cesar/Documents/ai-tools-export/genai-stack/USAGE.md) for detailed smoke test commands to verify each agent.
+Consultá el archivo [USAGE.md](file:///C:/Users/cesar/Documents/ai-tools-export/genai-stack/USAGE.md) para ver los comandos de prueba de humo detallados y verificar el funcionamiento de cada agente.
