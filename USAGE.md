@@ -1,173 +1,138 @@
-# genai-stack — Guía de uso
+# genai-stack — Guía de Uso y Laboratorio de Pruebas
 
-## Arquitectura
-
-Los agentes Java nunca le hablan directo a Ollama — siempre pasan por LiteLLM (proxy estilo OpenAI).
-
-```
-[cliente]  →  Agente :808x  →  LiteLLM :4000  →  Ollama :11434
-                           ↘  Qdrant :6333
-```
-
-| Servicio       | Puerto | Rol                          |
-|----------------|--------|------------------------------|
-| LiteLLM        | 4000   | Proxy LLM (OpenAI-compatible)|
-| Ollama         | 11434  | LLM runtime local            |
-| Qdrant         | 6333   | Vector store                 |
-| Langfuse       | 3001   | Observabilidad de trazas     |
-| doc-query-agent| 8080   | Agente RAG                   |
-| diagnosis-agent| 8081   | Agente de diagnóstico        |
-| smart-search-agent | 8082 | Agente con tool use        |
+Este proyecto es un laboratorio para experimentar con Inteligencia Artificial Generativa bajo dos enfoques:
+1. **Low-Code / Visual**: Usando **Flowise** para armar flujos rápidos de datos y prototipos de agentes.
+2. **Código Custom (Pro)**: Usando microservicios **Java 21 / Spring Boot 3.x / Spring AI** con arquitectura hexagonal.
 
 ---
 
-## Verificar estado de los containers
+## 1. Mapa de Componentes y URLs
 
-```bash
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-```
+Cuando levantás el entorno con `docker compose up`, se exponen los siguientes servicios:
 
-Si alguno está caído:
+### Dashboards y Herramientas Web (UI)
 
-```bash
-docker compose up -d <nombre-del-servicio>
-```
+| Servicio | URL en tu Navegador | Rol | Credenciales / Config |
+| :--- | :--- | :--- | :--- |
+| **Flowise UI** | [http://localhost:3000](http://localhost:3000) | Orquestación visual low-code para agentes y RAG. | Sin contraseña (desarrollo local). |
+| **Qdrant Dashboard** | [http://localhost:6333/dashboard](http://localhost:6333/dashboard) | Consola web de la base de datos vectorial para ver colecciones y vectores. | Sin contraseña. |
+| **Langfuse UI** | [http://localhost:3001](http://localhost:3001) | Trazabilidad y observabilidad para monitorear prompts y costos. | Crear cuenta inicial al ingresar. |
 
----
+### APIs de Infraestructura (Backend)
 
-## Agente 1 — doc-query-agent (:8080)
+| Servicio | URL desde Host (Windows) | Hostname Interno (Docker) | Rol |
+| :--- | :--- | :--- | :--- |
+| **LiteLLM Proxy** | `http://localhost:4000` | `http://litellm:4000` | Proxy OpenAI-compatible (administra modelos cloud y locales). |
+| **Ollama** | `http://localhost:11434` | `http://ollama:11434` | Runtime local para correr modelos de LLM y embeddings. |
+| **Qdrant API** | `http://localhost:6333` | `http://qdrant:6333` | Vector store (API REST y gRPC). |
 
-**Patrón:** RAG (Retrieval-Augmented Generation) sobre Qdrant.  
-**Modelo:** Ollama local (`llama3.2:3b`).  
-**Documento disponible:** `docs/Elementos de Arquitectura y Diseño (1.0.0).pdf`
+### APIs de los Agentes Custom (Java)
 
-### Paso 1 — Ingestar el documento
-
-Necesita ejecutarse al menos una vez (o cuando cambie el contenido de `./docs`).
-
-```bash
-curl -X POST http://localhost:8080/api/v1/ingest
-```
-
-Respuesta esperada:
-```json
-{"filesProcessed": 1, "chunksLoaded": 42}
-```
-
-### Paso 2 — Consultar
-
-```bash
-curl -X POST http://localhost:8080/api/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"question": "¿Qué es la arquitectura hexagonal?"}'
-```
-
-Respuesta:
-```json
-{
-  "answer": "...",
-  "sources": [
-    { "file": "Elementos de Arquitectura...", "snippet": "..." }
-  ]
-}
-```
-
-El campo `sources` indica de qué parte del documento vino cada respuesta.
+| Agente | Puerto | Endpoint Principal | Rol / Patrón |
+| :--- | :--- | :--- | :--- |
+| **doc-query-agent** | `8080` | `POST /api/v1/query` | RAG sobre documentación local (Ollama). |
+| **diagnosis-agent** | `8081` | `POST /api/v1/diagnose` | Diagnóstico estructurado de logs de error (Ollama). |
+| **smart-search-agent** | `8082` | `POST /api/v1/chat` | Tool calling / Agentic search (Gemini Cloud). |
+| **orchestrator-agent** | `8083` | `POST /api/v1/ask` | Orquestador multi-agente que deriva a los anteriores. |
 
 ---
 
-## Agente 2 — diagnosis-agent (:8081)
+## 2. Guía Práctica: Crear un Flujo RAG en Flowise (Low-Code)
 
-**Patrón:** Prompt directo con respuesta estructurada.  
-**Modelo:** Ollama local (`llama3.2:3b`).  
-**Uso:** Diagnóstico de errores a partir de un log o stack trace.
+Flowise te permite cargar PDFs y chatear con ellos sin escribir una sola línea de código, usando los mismos modelos de Ollama y la base de datos Qdrant que usan tus agentes Java.
 
-```bash
-curl -X POST http://localhost:8081/api/v1/diagnose \
-  -H "Content-Type: application/json" \
-  -d '{"log": "java.lang.NullPointerException at com.example.Service.process(Service.java:42)"}'
-```
+### Paso a paso para armar tu primer flujo de documentos:
 
-Respuesta:
-```json
-{
-  "rootCause": "...",
-  "location": "com.example.Service.process(Service.java:42)",
-  "suggestion": "..."
-}
-```
-
----
-
-## Agente 3 — smart-search-agent (:8082)
-
-**Patrón:** Tool use / Function calling.  
-**Modelo:** Gemini 2.5-flash (cloud) — el modelo local no soporta tool calling en formato OpenAI.  
-**Limite:** Free tier de Gemini = 20 requests/día. Cada request con tool use consume 2 créditos (2 roundtrips).
-
-El agente decide autónomamente qué tool invocar según la pregunta.
-
-### Tools disponibles
-
-| Tool | Descripción |
-|------|-------------|
-| `getCurrentDate` | Devuelve la fecha actual en formato ISO-8601 |
-| `searchDocs` | Busca en Qdrant (requiere ingest previo en el agente 1) |
-
-### Verificar getCurrentDate
-
-```bash
-curl -X POST http://localhost:8082/api/v1/chat -H "Content-Type: application/json" -d "{\"question\":\"Que fecha es hoy?\"}"
-```
-
-Respuesta real (2026-06-29):
-```json
-{"answer":"Hoy es 29 de junio de 2026.","toolsUsed":["getCurrentDate"]}
-```
-
-### Verificar searchDocs (requiere ingest previo en agente 1)
-
-```bash
-curl -X POST http://localhost:8082/api/v1/chat -H "Content-Type: application/json" -d "{\"question\":\"Que patrones arquitectonicos menciona el documento?\"}"
-```
-
-Respuesta real (2026-06-29):
-```json
-{
-  "answer": "El documento menciona los siguientes elementos de arquitectura y diseño:\n\n* **Dominio del sistema**: Se refiere a todo el conocimiento relacionado con el sistema...\n* **Value Object**: Objetos que son idénticos si sus valores son iguales...\n* **Business Objects (BO)**: Forma de modelar los procesos y tareas dentro del sistema...",
-  "toolsUsed": ["searchDocs"]
-}
-```
-
-El campo `toolsUsed` muestra qué tools invocó el modelo para responder.
-
-> **Nota de rendimiento:** El agente 3 responde en ~3 segundos porque usa Gemini cloud. El agente 1 tarda ~3 minutos porque usa llama3.2:3b en CPU local. El trade-off es intencional: documentos sensibles quedan en el modelo local.
-
-> **En Windows**, usar comillas dobles escapadas en el `-d`. Las comillas simples no funcionan en PowerShell/cmd.
+1. Abrí [http://localhost:3000](http://localhost:3000) en tu navegador.
+2. Hacé clic en **Add New** para crear un chatflow nuevo.
+3. Agrega los siguientes nodos usando el menú lateral izquierdo (`+`):
+   - **Vector Stores > Qdrant**: Es el nodo que conectará con tu base vectorial.
+     - *Connect Database:* `http://qdrant:6333` (Ojo: usá el hostname interno de Docker, no `localhost`).
+     - *Collection Name:* Poné un nombre descriptivo, por ejemplo, `flowise-docs`.
+   - **Document Loaders > Folder** (o **PDF File**):
+     - Arrastralo y conectalo a la entrada `Document` del nodo Qdrant.
+     - Cargá el PDF que querés indexar o configuralo para leer de `./docs`.
+   - **Embeddings > Ollama Embeddings**:
+     - Conectalo a la entrada `Embeddings` del nodo Qdrant.
+     - *Base Path:* `http://ollama:11434`.
+     - *Model Name:* `nomic-embed-text`.
+   - **Chat Models > Ollama Chat**:
+     - Conectalo a la entrada `Model` de la cadena conversacional.
+     - *Base Path:* `http://ollama:11434`.
+     - *Model Name:* `llama3.2:3b`.
+   - **Chains > Conversational Retrieval QA Chain**:
+     - Este nodo une todo. Conectá el nodo de Qdrant a su entrada `Vector Store Retriever` y el de Ollama Chat a su entrada `Model`.
+4. Hacé clic en el ícono de guardar (arriba a la derecha), ponelo en marcha e ingresá al chat de pruebas de Flowise para hacerle preguntas sobre tu documento.
+5. Podés monitorear los vectores generados entrando al [Dashboard de Qdrant](http://localhost:6333/dashboard) para ver la nueva colección creada.
 
 ---
 
-## Flujo completo de prueba (orden recomendado)
+## 3. Guía de Uso de los Agentes Custom (Java)
 
-```bash
-# 1. Verificar containers
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+Cada agente de Java es un servicio independiente que se expone en su propio puerto. A continuación tenés los comandos para probarlos usando `curl` (en Windows PowerShell, acordate de usar comillas dobles escapadas).
 
-# 2. Ingestar documentos (una sola vez)
-curl -X POST http://localhost:8080/api/v1/ingest
+### 3.1 Agente 1: Consulta de Documentación (doc-query-agent :8080)
+Este agente implementa RAG en Java con arquitectura hexagonal. Consume la documentación de la carpeta `./docs`.
 
-# 3. Probar RAG
-curl -X POST http://localhost:8080/api/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"question": "¿Qué es un puerto en arquitectura hexagonal?"}'
+* **Ingestar Documentación** (debe correrse al menos una vez para cargar los vectores en Qdrant):
+  ```bash
+  curl -X POST http://localhost:8080/api/v1/ingest
+  ```
+  *Respuesta:* `{"filesProcessed": 1, "chunksLoaded": 42}`
 
-# 4. Probar diagnóstico
-curl -X POST http://localhost:8081/api/v1/diagnose \
-  -H "Content-Type: application/json" \
-  -d '{"log": "ERROR org.springframework.dao.DataIntegrityViolationException: could not execute statement"}'
+* **Realizar Consulta RAG**:
+  ```bash
+  curl -X POST http://localhost:8080/api/v1/query \
+    -H "Content-Type: application/json" \
+    -d "{\"question\": \"¿Qué es la arquitectura hexagonal?\"}"
+  ```
 
-# 5. Probar tool use
-curl -X POST http://localhost:8082/api/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question": "¿Qué fecha es hoy?"}'
-```
+### 3.2 Agente 2: Diagnóstico de Errores (diagnosis-agent :8081)
+Mapea un log crudo a una respuesta JSON con estructura rígida (`rootCause`, `location`, `suggestion`).
+
+* **Ejecutar Diagnóstico**:
+  ```bash
+  curl -X POST http://localhost:8081/api/v1/diagnose \
+    -H "Content-Type: application/json" \
+    -d "{\"log\": \"java.lang.NullPointerException at com.example.Service.process(Service.java:42)\"}"
+  ```
+
+### 3.3 Agente 3: Agente Autónomo con Herramientas (smart-search-agent :8082)
+Usa Gemini-Flash para decidir qué herramientas (`getCurrentDate`, `searchDocs`) invocar para responder preguntas libres.
+
+* **Probar Tool Use**:
+  ```bash
+  curl -X POST http://localhost:8082/api/v1/chat \
+    -H "Content-Type: application/json" \
+    -d "{\"question\": \"¿Qué fecha es hoy?\"}"
+  ```
+  *Respuesta:* `{"answer":"Hoy es 29 de junio de 2026.","toolsUsed":["getCurrentDate"]}`
+
+### 3.4 Agente 4: Orquestador General (orchestrator-agent :8083)
+Punto de entrada único que analiza la semántica de la consulta del usuario y rutea al agente adecuado (`doc-query`, `diagnosis` o `smart-search`) exponiendo el campo `routedTo`.
+
+* **Ejecutar Consulta Orquestada**:
+  ```bash
+  curl -X POST http://localhost:8083/api/v1/ask \
+    -H "Content-Type: application/json" \
+    -d "{\"question\": \"Tengo este error: org.postgresql.util.PSQLException: Connection refused\"}"
+  ```
+  *Respuesta esperada:*
+  ```json
+  {
+    "answer": "El error indica que la aplicación no se pudo conectar con Postgres...",
+    "routedTo": "diagnosis-agent"
+  }
+  ```
+
+---
+
+## 4. Trazabilidad y Monitoreo con Langfuse
+
+Toda la actividad de los modelos cloud de tus agentes queda registrada para auditoría en Langfuse.
+1. Entrá a [http://localhost:3001](http://localhost:3001).
+2. Registrá un usuario administrador (solo local).
+3. Vas a poder ver en tiempo real:
+   - Cuántos tokens consume cada agente.
+   - El árbol de llamadas del orquestador hacia los agentes secundarios.
+   - La latencia exacta de cada interacción.
