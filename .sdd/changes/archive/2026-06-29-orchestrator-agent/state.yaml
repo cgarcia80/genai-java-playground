@@ -1,0 +1,47 @@
+change: orchestrator-agent
+current_phase: archive
+status: archived
+last_updated: 2026-06-29
+artifacts:
+  exploration: null
+  proposal: .sdd/changes/archive/orchestrator-agent/proposal.md
+  specs:
+    - .sdd/changes/archive/orchestrator-agent/specs/orchestrator-agent/spec.md
+  design: .sdd/changes/archive/orchestrator-agent/design.md
+  tasks: .sdd/changes/archive/orchestrator-agent/tasks.md
+  verification: .sdd/changes/archive/orchestrator-agent/verification.md
+last_result:
+  status: success
+  summary_es: "Archivado del cambio completado exitosamente. La especificación final fue consolidada y los artefactos se movieron a la carpeta de archivo."
+  next_phase_recommended: null
+risks:
+  - '[W-F1] env var SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL muerta en docker-compose.yaml -- location: docker-compose.yaml service orchestrator-agent environment -- action: remover la linea o aceptar como deuda tecnica.'
+  - '[W-F2] project-memory.md no existe -- location: .sdd/project-memory.md -- action: crear en change separado o declarar learnings.md como fuente canonica.'
+  - '[S-F3] SpringAiConfig.java deberia renombrarse a RestClientConfig -- location: infrastructure/config/SpringAiConfig.java'
+  - '[S-F4] depends_on litellm en orchestrator-agent es redundante -- location: docker-compose.yaml service orchestrator-agent depends_on'
+  - 'Deuda operativa Tier 2: smoke E2E real requiere Ollama y modelos locales disponibles. No bloquea archive.'
+questions_for_user:
+  - 'WARNING F1: env var SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL muerta en docker-compose.yaml. La resolvés ahora o la aceptás como deuda técnica?'
+  - 'WARNING F2: project-memory.md no existe. Lo creás en un change separado o lo aceptás como deuda técnica?'
+context_health:
+  session_id: codex-2026-06-29-c
+  phases_in_session: 2
+  apply_retry_count: 0
+  verify_block_count: 0
+  files_modified_in_apply: 34
+  scope_expansion_count: 1
+  consecutive_tool_errors: 0
+  heavy_artifact_detected: false
+  health_status: yellow
+  session_advisory: FRESH_SESSION
+  last_action_recommended: ARCHIVE_OR_RESOLVE_WARNINGS
+  soft_red_overrides:
+    - signal: files_modified_in_apply
+      value: 27
+      approved_by_user: true
+      timestamp: 2026-06-29T13:27:00-03:00
+    - signal: files_modified_in_apply
+      value: 34
+      approved_by_user: true
+      timestamp: 2026-06-29T15:42:00-03:00
+  last_checked: 2026-06-29

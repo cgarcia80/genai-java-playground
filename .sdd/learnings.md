@@ -1,9 +1,29 @@
 # Learnings — genai-stack
 
 > Documentación de decisiones técnicas, patrones encontrados, y gotchas capturados durante el desarrollo del stack de agentes.
-> Última actualización: 2026-06-27.
+> Última actualización: 2026-06-29.
+
+## 2026-06-29 — orchestrator-agent (agente 4)
+
+### Patrón multi-agente con ruteo local determinístico
+
+- **What**: Construido `orchestrator-agent` como dispatcher central que delega a `doc-query-agent`, `diagnosis-agent` y `smart-search-agent` vía HTTP calls síncronos con `RestClient`. El ruteo es determinístico y basado en análisis local de palabras clave del prompt (sin invocar LLM).
+- **Why**: El modelo `llama3.2:3b` no soporta tool calling en formato OpenAI vía LiteLLM — se cuelga sin responder. Cambio de diseño de tool-based LLM routing a rule-based local classification. Reduce quota consumida (sin LLM roundtrips para decidir) y elimina latencias de red innecesarias.
+- **Where**: 
+  - `agents/orchestrator-agent/src/` (nuevo módulo Spring Boot en `:8083`)
+  - `docker-compose.yaml` (service `orchestrator-agent` agregado)
+  - Delta spec: `.sdd/specs/orchestrator-agent/spec.md`
+  - Tests: `OrchestratorControllerTest`, `RuleBasedRoutingClassifierTest`, `DownstreamAgentClientTest`
+- **Learned**:
+  - **Tres `RestClient` beans dedicados**: Un cliente por downstream (doc-query, diagnosis, smart-search) encapsula la URL base y timeouts. Trivial de mockear en tests y permite evolucionar timeout por destino sin afectar otros.
+  - **Timeout de 90s para read, 5s para connect**: Los modelos locales pequeños en hardware limitado tardan (cold start + inference en 3B params). La lectura debe ser tolerante; la conexión debe ser rápida (esperamos que el agente esté listo).
+  - **Aplastamiento de respuesta downstream a String**: Cada downstream devuelve estructura distinta (`doc-query` → `{answer, sources}`, `diagnosis` → `{rootCause, location, suggestion}`). Aplanar a `String` reduce tokens enviados al modelo (quota Gemini de 20 RPD es crítica) y simplifica el contrato de respuesta.
+  - **ThreadLocal para tracking de tool invocado**: Patrón replicado de `smart-search-agent`: las `@Tool` métodos del orchestrator (si hubiese tool use) podrían registrar qué agente fue invocado. Aquí se usa para registrar el `routedTo` en el `X-Bypass-Routing` flow.
+  - **Header `X-Bypass-Routing` para smoke dev**: Permite forzar un downstream específico sin pasar por el clasificador de ruteo. Crítico para testing local cuando queres validar que doc-query funciona sin que el router te redirija a diagnosis.
+  - **`DownstreamAgentException` → HTTP 502**: Mapping explícito de fallos downstream a 502 Bad Gateway. El cliente sabe que el fallo fue en upstream, no un error de validación 4xx.
 
 ## 2026-06-29 — agentes 1, 2 y 3
+
 
 ### doc-query-agent (agente 1) — fix directo post-verify
 

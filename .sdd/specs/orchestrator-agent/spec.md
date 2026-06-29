@@ -85,3 +85,34 @@ The system SHALL return HTTP 502 when the invoked downstream agent returns an er
 - **GIVEN** el downstream seleccionado devuelve HTTP 5xx o no responde
 - **WHEN** el orchestrator intenta el call
 - **THEN** HTTP 502 al cliente
+
+---
+
+## Validation Strategy
+
+### Contract compliance (obligatorio — bloquea archive)
+
+Los escenarios de este spec se verifican a nivel de tests unitarios y WebMvc con mock server:
+
+| Capa | Clase de test | Cubre |
+|------|--------------|-------|
+| Clasificacion | `RuleBasedRoutingClassifierTest` | Ruteo doc-query, diagnosis, smart-search |
+| Cliente HTTP | `DownstreamAgentClientTest` | Payloads correctos y flatten de respuesta para cada downstream |
+| Controller / WebMvc | `OrchestratorControllerTest` | Contrato API, bypass valido/invalido, 502 downstream |
+| Use case | `OrchestrateUseCaseTest` | Delegacion normal y bypass |
+| Domain | `RoutingTargetTest` | Parsing de RoutingTarget |
+
+Todos los escenarios GIVEN/WHEN/THEN de los requisitos anteriores se satisfacen cuando los tests de las capas correspondientes pasan. El mock server simula el comportamiento del downstream (HTTP 200 con respuesta, HTTP 5xx con error); no se requiere downstream real operativo.
+
+### Operational validation (deuda conocida — no bloquea archive)
+
+El smoke E2E real con `doc-query-agent` y `diagnosis-agent` operativos depende de que Ollama y los modelos locales esten disponibles y respondan dentro del timeout. Esta validacion queda documentada como **deuda operativa conocida**: el comportamiento del orchestrator es correcto; la dependencia es externa y fuera del scope del change.
+
+Cuando el entorno local este disponible, ejecutar:
+```
+POST http://localhost:8083/api/v1/ask  {"question": "Que son las entidades?"}
+# Esperado: HTTP 200, routedTo=doc-query-agent
+
+POST http://localhost:8083/api/v1/ask  {"question": "java.lang.NullPointerException at ..."}
+# Esperado: HTTP 200, routedTo=diagnosis-agent
+```

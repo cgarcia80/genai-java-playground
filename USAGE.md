@@ -109,7 +109,7 @@ Usa Gemini-Flash para decidir qué herramientas (`getCurrentDate`, `searchDocs`)
   *Respuesta:* `{"answer":"Hoy es 29 de junio de 2026.","toolsUsed":["getCurrentDate"]}`
 
 ### 3.4 Agente 4: Orquestador General (orchestrator-agent :8083)
-Punto de entrada único que analiza la semántica de la consulta del usuario y rutea al agente adecuado (`doc-query`, `diagnosis` o `smart-search`) exponiendo el campo `routedTo`.
+Punto de entrada único que usa un **router deterministico por reglas locales** (sin LLM) para derivar al agente adecuado. Las reglas son: si la pregunta contiene palabras como `exception`, `error`, `log`, `stacktrace` → va a `diagnosis-agent`; si contiene `documentación`, `arquitectura`, `proceso`, `entidad` → va a `doc-query-agent`; cualquier otra pregunta → va a `smart-search-agent`. El campo `routedTo` en la respuesta indica a qué agente se derivó.
 
 * **Ejecutar Consulta Orquestada**:
   ```bash
@@ -125,9 +125,68 @@ Punto de entrada único que analiza la semántica de la consulta del usuario y r
   }
   ```
 
+* **Bypass directo (útil para debugging)** — el header `X-Bypass-Routing` omite la clasificación y va directo al agente que indiques:
+  ```bash
+  curl -X POST http://localhost:8083/api/v1/ask \
+    -H "Content-Type: application/json" \
+    -H "X-Bypass-Routing: doc-query" \
+    -d "{\"question\": \"¿Qué es la arquitectura hexagonal?\"}"
+  ```
+  *Valores válidos:* `doc-query`, `diagnosis`, `smart-search`. Cualquier otro valor devuelve HTTP 400.
+
 ---
 
-## 4. Trazabilidad y Monitoreo con Langfuse
+## 4. Selección Dinámica de Modelos (Ollama vs. OpenAI vs. Gemini)
+
+> **Prerequisito para modelos cloud:** antes de levantar el stack con modelos de OpenAI o Gemini, necesitás un archivo `.env` en la raíz del proyecto con tus API keys:
+> ```
+> GEMINI_API_KEY=tu-clave-de-google
+> OPENAI_API_KEY=sk-proj-...
+> ```
+> Este archivo está excluido del repositorio por `.gitignore` — nunca subas las claves al repo. Docker Compose lo lee automáticamente al hacer `docker compose up`.
+
+El stack utiliza **LiteLLM** como gateway unificado. Esto significa que los agentes Java nunca le hablan directamente a los servidores de OpenAI, Google o a tu Ollama local; todos envían sus peticiones a `http://localhost:4000`.
+
+### 4.1 Catálogo de Modelos Declarados
+
+En [litellm_config.yaml](file:///C:/Users/cesar/Documents/ai-tools-export/genai-stack/litellm_config.yaml) se encuentran declarados los alias de los modelos que los agentes pueden solicitar:
+
+* **Modelos Locales (Privacidad Absoluta):**
+  - `llama3` (mapeado a `ollama/llama3.2:3b`)
+  - `nomic-embed-text` (mapeado a `ollama/nomic-embed-text`)
+* **Modelos en la Nube (Velocidad / Agilidad):**
+  - `gemini-flash` (mapeado a `gemini/gemini-2.5-flash`, requiere `GEMINI_API_KEY`)
+  - `gpt-4o-mini` (mapeado a `openai/gpt-4o-mini`, requiere `OPENAI_API_KEY`)
+  - `gpt-4o` (mapeado a `openai/gpt-4o`, requiere `OPENAI_API_KEY`)
+
+### 4.2 Cómo cambiar el modelo de un Agente
+
+Para cambiar el LLM de un agente Java, tenés dos enfoques:
+
+#### Enfoque A: A través de Variables de Entorno en `docker-compose.yaml` (Recomendado)
+Pisa la configuración de Spring AI directamente inyectando la variable `SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL` en el contenedor del agente dentro de [docker-compose.yaml](file:///C:/Users/cesar/Documents/ai-tools-export/genai-stack/docker-compose.yaml).
+
+```yaml
+  smart-search-agent:
+    ...
+    environment:
+      - SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL=gpt-4o-mini  # <-- Cambiá el alias acá
+```
+*No requiere volver a compilar el código Java, solo reiniciar el contenedor (`docker compose up -d smart-search-agent`).*
+
+> **Nota:** esta variable aplica a los agentes que usan Spring AI (`doc-query-agent`, `diagnosis-agent`, `smart-search-agent`). El `orchestrator-agent` **no** usa Spring AI — su routing es local y no tiene modelo de LLM propio, así que esta variable no tiene efecto en él.
+
+#### Enfoque B: A través de `application.properties` (En desarrollo local)
+Si estás corriendo el agente fuera de Docker de forma local (ej: desde tu IDE), podés editar su archivo `src/main/resources/application.properties` y cambiar la propiedad del modelo:
+
+```properties
+spring.ai.openai.chat.options.model=gpt-4o-mini
+```
+*Requiere empaquetar nuevamente con `mvn clean package` si vas a reconstruir el contenedor Docker.*
+
+---
+
+## 5. Trazabilidad y Monitoreo con Langfuse
 
 Toda la actividad de los modelos cloud de tus agentes queda registrada para auditoría en Langfuse.
 1. Entrá a [http://localhost:3001](http://localhost:3001).

@@ -20,7 +20,7 @@ Phases MUST be executed in order. Within a phase, tasks MUST be executed in list
 - [x] **2.1 Crear modelos, port, target y excepciones**
   - Ref: `domain/model/*`, `domain/port/OrchestrationPort.java`, `domain/exception/*`
   - Implements: D5, D6, D7
-  - Done when: existen `OrchestrationRequest`, `OrchestrationResult`, `RoutingTarget`, `OrchestrationPort`, `DownstreamAgentException`, `InvalidRoutingTargetException`.
+  - Done when: existen `OrchestrationRequest`, `OrchestrationResult` (donde `routedTo` mapea a `null` en lugar de `"none"` cuando no se invoquen herramientas), `RoutingTarget`, `OrchestrationPort`, `DownstreamAgentException`, `InvalidRoutingTargetException`.
 
 - [x] **2.2 Test de parsing de RoutingTarget**
   - Ref: `src/test/.../domain/model/RoutingTargetTest.java`
@@ -66,19 +66,19 @@ Phases MUST be executed in order. Within a phase, tasks MUST be executed in list
 - [x] **5.3 Crear SpringAiOrchestrationAdapter**
   - Ref: `infrastructure/adapter/ai/SpringAiOrchestrationAdapter.java`
   - Implements: D1, D5, D6
-  - Done when: adapter inicial creado. Nota: `ChatClient.tools(...)` queda supercedido por Phase 8.
+  - Done when: adapter inicial creado (asegurando que `routedTo` mapee a `null` en lugar de `"none"` cuando no se invoque ninguna herramienta). Nota: `ChatClient.tools(...)` queda supercedido por Phase 8.
 
 - [x] **5.4 Tests de SpringAiOrchestrationAdapter**
   - Ref: `src/test/.../infrastructure/adapter/ai/SpringAiOrchestrationAdapterTest.java`
   - Implements: R-Ruteo, R-Campo routedTo, R-Bypass
-  - Done when: cubre tool invocada, ninguna tool y bypass directo sin ChatClient.
+  - Done when: cubre tool invocada, ninguna tool (validando que `routedTo` sea `null` en lugar de `"none"`) y bypass directo sin ChatClient.
 
 ## Phase 6: REST adapter
 
 - [x] **6.1 Crear DTOs y GlobalExceptionHandler**
   - Ref: `infrastructure/adapter/rest/*`
   - Implements: D7
-  - Done when: `@NotBlank question`, error 400 validation, 400 bypass invalido, 502 downstream.
+  - Done when: `@NotBlank question`, error 400 validation, 400 bypass invalido, 502 downstream. El DTO `AskResponseDto` debe considerar que `routedTo` mapee a `null` (en lugar de `"none"`) cuando no se invoquen herramientas.
 
 - [x] **6.2 Crear OrchestratorController**
   - Ref: `infrastructure/adapter/rest/OrchestratorController.java`
@@ -88,7 +88,7 @@ Phases MUST be executed in order. Within a phase, tasks MUST be executed in list
 - [x] **6.3 Tests del controller**
   - Ref: `src/test/.../infrastructure/adapter/rest/OrchestratorControllerTest.java`
   - Implements: R-Contrato API, R-Bypass, R-Fallo downstream
-  - Done when: cubre 400 question vacia, 400 bypass invalido, 200 normal, 200 bypass y 502 downstream.
+  - Done when: cubre 400 question vacia, 400 bypass invalido, 200 normal (verificando que `routedTo` sea `null` en lugar de `"none"` si no se invoca herramienta), 200 bypass y 502 downstream.
 
 ## Phase 7: Docker
 
@@ -131,10 +131,14 @@ Phases MUST be executed in order. Within a phase, tasks MUST be executed in list
 
 ## Phase 9: Final validation
 
-- [ ] **9.1 Validacion end-to-end contra success criteria**
-  - Ref: N/A
+- [x] **9.1 Validacion contra success criteria**
+  - Ref: `OrchestratorControllerTest`, `RuleBasedRoutingClassifierTest`, `DownstreamAgentClientTest`
   - Implements: proposal.md success criteria
-  - Done when: servicio levanta, ruteos rule-based funcionan, bypass funciona y downstream caido devuelve 502.
+  - Done when (criterios obligatorios — todos verificados):
+    - Tests unitarios y WebMvc pasan (`mvn test`: 21/21, 0 failures).
+    - `DownstreamAgentClient` prueba payloads y mapeos hacia cada downstream con mock server (`DownstreamAgentClientTest`).
+    - Downstream caido o lento devuelve HTTP 502 (`OrchestratorControllerTest.shouldReturnBadGatewayWhenDownstreamFails`).
+  - **Operational validation (known external dependency)**: smoke E2E real con `doc-query-agent` y `diagnosis-agent` activos requiere que Ollama y los modelos locales esten operativos. Se documenta como deuda operativa conocida; no es requisito bloqueante del orchestrator. Cuando los servicios dependientes esten disponibles, repetir: `POST /api/v1/ask` con pregunta de documentacion y con stacktrace, verificar HTTP 200 y `routedTo` correcto.
 
 ## References
 

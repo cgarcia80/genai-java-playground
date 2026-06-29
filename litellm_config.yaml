@@ -17,4 +17,16 @@ model_list:
       model: gemini/gemini-2.5-flash
       api_key: "os.environ/GEMINI_API_KEY"
 
+  # CLOUD: OpenAI GPT-4o-mini (rápido y económico, ideal para pruebas)
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: "os.environ/OPENAI_API_KEY"
+
+  # CLOUD: OpenAI GPT-4o (modelo estrella de OpenAI)
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: "os.environ/OPENAI_API_KEY"
+
 general_settings: {}
