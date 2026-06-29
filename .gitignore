@@ -1,0 +1,32 @@
+# Java / Maven
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDEs and Editors
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+*.sublime-project
+*.sublime-workspace
+
+# OS and temporary files
+Thumbs.db
+.DS_Store
+*.log
+tmp/
+temp/
+
+# Environment Variables & Secrets (NEVER commit these)
+.env
+.env*.local
+
+# SDD Local / Cache files (Ignore registry cache but keep spec folders)
+.atl/
+.antigravitycli/
+.claude/

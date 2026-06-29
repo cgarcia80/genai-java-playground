@@ -1,0 +1,41 @@
+# .sdd/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: Docker Compose (infraestructura), Java 21 + Spring Boot 3.x + Spring AI (agentes, a construir)
+  Architecture: Gateway pattern (LiteLLM proxy) + hexagonal por agente
+  Testing: smoke tests via curl (infraestructura); JUnit 5 + Testcontainers (agentes Java, pendiente)
+  Style: N/A en infraestructura; Checkstyle/Spotless a definir en agentes Java
+
+testing:
+  test_runner:
+    command: ""
+    framework: "manual (curl smoke tests)"
+  layers:
+    unit: false
+    integration: false
+    e2e: false
+  coverage:
+    available: false
+    command: ""
+  quality:
+    linter: ""
+    type_checker: ""
+    formatter: ""
+
+rules:
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Document decisions with rationale and alternatives considered
+  tasks:
+    - For infrastructure changes: pair each config change with a curl validation task
+    - For Java agents: group tasks by layer (domain first for hexagonal)
+  apply:
+    - Follow existing docker-compose.yaml patterns for infrastructure changes
+    - Mark tasks [x] immediately after completing them
+    - Only sdd-apply modifies source files or docker-compose.yaml
+  verify:
+    - For infrastructure: verify with curl smoke tests as defined in the change
+    - For Java agents: run tests if test infrastructure exists

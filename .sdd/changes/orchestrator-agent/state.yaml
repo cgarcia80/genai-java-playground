@@ -1,0 +1,46 @@
+change: orchestrator-agent
+current_phase: apply
+status: in-progress
+last_updated: 2026-06-29
+artifacts:
+  exploration: null
+  proposal: .sdd/changes/orchestrator-agent/proposal.md
+  specs:
+    - .sdd/changes/orchestrator-agent/specs/orchestrator-agent/spec.md
+  design: .sdd/changes/orchestrator-agent/design.md
+  tasks: .sdd/changes/orchestrator-agent/tasks.md
+  verification: null
+last_result:
+  status: blocked
+  summary_es: >
+    Ajuste de diseño aplicado: read-timeout local del orchestrator sube a 90s para evitar falsos 502
+    con Ollama/LiteLLM lento durante smoke. Cambio minimo aplicado en application.properties.
+  next_phase_recommended: verify
+risks:
+  - "Tool calling con llama3 local puede fallar; verify debe bloquear si no invoca tools de forma confiable."
+  - "El change no tiene exploration.md historico; se conserva exploration: null para no inventar auditoria retroactiva."
+  - "litellm_config.yaml mantiene una API key Gemini hardcodeada; recomendado como change separado de seguridad."
+  - "Soft RED: files_modified_in_apply=27 supera el umbral >25. Requiere override explicito para continuar en esta sesion."
+  - "[F1] Queda una tarea pendiente en tasks.md — location: .sdd/changes/orchestrator-agent/tasks.md:102 — action: completar o resolver explicitamente la tarea 8.1 y volver a correr sdd-verify."
+  - "[F2] El bypass real a downstream devuelve 502 — location: agents/orchestrator-agent/src/main/java/com/genailab/orchestrator/infrastructure/adapter/ai/AgentTools.java:41 — action: hacer que al menos un bypass real a downstream disponible devuelva HTTP 200 y routedTo correcto, luego repetir smoke."
+  - "Re-apply detenido: aumentar read-timeout o cambiar estrategia de smoke requiere actualizar design/tasks antes de codigo."
+  - "Re-apply minimo aplicado: repetir verify y smoke E2E con read-timeout=90s."
+questions_for_user: []
+context_health:
+  session_id: codex-2026-06-29
+  phases_in_session: 6
+  apply_retry_count: 0
+  verify_block_count: 1
+  files_modified_in_apply: 34
+  scope_expansion_count: 1
+  consecutive_tool_errors: 0
+  heavy_artifact_detected: false
+  health_status: red
+  session_advisory: null
+  last_action_recommended: REAPPLY_CRITICAL_FINDINGS
+  soft_red_overrides:
+    - signal: files_modified_in_apply
+      value: 27
+      approved_by_user: true
+      timestamp: 2026-06-29T13:27:00-03:00
+  last_checked: 2026-06-29

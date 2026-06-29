@@ -1,0 +1,30 @@
+change: agente-1-doc-query
+current_phase: done
+status: fixed-direct
+last_updated: 2026-06-29
+artifacts:
+  exploration: null
+  proposal: .sdd/changes/agente-1-doc-query/proposal.md
+  specs:
+    - .sdd/specs/doc-query-agent/spec.md
+  design: .sdd/changes/agente-1-doc-query/design.md
+  tasks: .sdd/changes/agente-1-doc-query/tasks.md
+  verification: .sdd/changes/agente-1-doc-query/verification.md
+last_result:
+  status: fixed-direct
+  summary_es: >
+    Agente operativo en :8080. Fix aplicado directamente (fuera de SDD por Hard RED).
+    Tres cambios: (1) similarity-threshold bajado de 0.70 a 0.50 en application.properties,
+    (2) Qdrant pinado a v1.13.1 en docker-compose.yaml para eliminar incompatibilidad
+    client/server, (3) log de score por chunk agregado en SpringAiDocumentQueryAdapter.
+    Smoke test exitoso: POST /api/v1/query con pregunta relevante devuelve answer + 5 sources
+    del PDF real. POST /api/v1/ingest devuelve 200 con 11 chunks. POST invalido devuelve 400.
+  next_phase_recommended: null
+risks:
+  - "similarity-threshold=0.50 sin traza SDD — si se regresa a 0.70 el agente deja de funcionar."
+  - "Qdrant v1.13.1 pinado — al actualizar Spring AI puede requerirse actualizar la imagen."
+  - "No se ejecutó archive SDD porque el fix fue directo. El change queda sin cerrar formalmente."
+questions_for_user: []
+context_health:
+  health_status: green
+  last_checked: 2026-06-29
