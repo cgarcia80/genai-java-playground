@@ -1,26 +1,19 @@
-package com.genailab.orchestrator.infrastructure.adapter.ai;
+package com.genailab.orchestrator.infrastructure.adapter.http;
 
 import com.genailab.orchestrator.domain.exception.DownstreamAgentException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 @Component
-public class AgentTools {
-
-  private static final ThreadLocal<List<String>> ROUTED_TO =
-      ThreadLocal.withInitial(ArrayList::new);
+public class DownstreamAgentClient {
 
   private final RestClient docQueryClient;
   private final RestClient diagnosisClient;
   private final RestClient smartSearchClient;
 
-  public AgentTools(
+  public DownstreamAgentClient(
       @Qualifier("docQueryClient") RestClient docQueryClient,
       @Qualifier("diagnosisClient") RestClient diagnosisClient,
       @Qualifier("smartSearchClient") RestClient smartSearchClient) {
@@ -29,29 +22,17 @@ public class AgentTools {
     this.smartSearchClient = smartSearchClient;
   }
 
-  public void clearRoutedTo() {
-    ROUTED_TO.get().clear();
-  }
-
-  public List<String> getRoutedTo() {
-    return Collections.unmodifiableList(ROUTED_TO.get());
-  }
-
-  @Tool(description = "Use when the question asks about internal documentation, specific documented features or processes. Forward the full question as the query.")
-  public String callDocQueryAgent(String query) {
-    ROUTED_TO.get().add("doc-query-agent");
+  public String callDocQueryAgent(String question) {
     DocQueryResponse response = post(
         docQueryClient,
         "/api/v1/query",
-        new DocQueryRequest(query),
+        new DocQueryRequest(question),
         DocQueryResponse.class,
         "doc-query-agent");
     return requireText(response.answer(), "doc-query-agent");
   }
 
-  @Tool(description = "Use when the user provides a stack trace, error log, or exception message, or asks to diagnose an error. Extract only the relevant log, stack trace or error text from the question and pass it as the logContent parameter. Do not include conversational wrapper text.")
   public String callDiagnosisAgent(String logContent) {
-    ROUTED_TO.get().add("diagnosis-agent");
     DiagnosisResponse response = post(
         diagnosisClient,
         "/api/v1/diagnose",
@@ -61,9 +42,7 @@ public class AgentTools {
     return diagnosisAnswer(response);
   }
 
-  @Tool(description = "Use for general questions requiring search, reasoning, or current-date information. Use when the question does not fit documentation lookup or error diagnosis.")
   public String callSmartSearchAgent(String question) {
-    ROUTED_TO.get().add("smart-search-agent");
     SmartSearchResponse response = post(
         smartSearchClient,
         "/api/v1/chat",

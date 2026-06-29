@@ -1,6 +1,6 @@
 change: orchestrator-agent
-current_phase: tasks
-status: pending-apply
+current_phase: apply
+status: in-progress
 last_updated: 2026-06-29
 artifacts:
   exploration: null
@@ -11,11 +11,11 @@ artifacts:
   tasks: .sdd/changes/orchestrator-agent/tasks.md
   verification: null
 last_result:
-  status: blocked
+  status: ok
   summary_es: >
-    Contrato actualizado a router rule-based local. Proposal, spec, design y tasks quedan alineados:
-    el orchestrator ya no debe usar LLM/tool calling para decidir ruteo.
-  next_phase_recommended: apply
+    Phase 8 implementada y validada con mvn test: router rule-based local, cliente HTTP downstream
+    y remocion de Spring AI/tool calling del orchestrator. Queda pendiente verify E2E final.
+  next_phase_recommended: verify
 risks:
   - "Tool calling con llama3 local puede fallar; verify debe bloquear si no invoca tools de forma confiable."
   - "El change no tiene exploration.md historico; se conserva exploration: null para no inventar auditoria retroactiva."
@@ -27,6 +27,7 @@ risks:
   - "Re-apply minimo aplicado: repetir verify y smoke E2E con read-timeout=90s."
   - "Nuevo bloqueo de diseño: ruteo LLM local con llama3 no devuelve respuesta en smoke sin bypass."
   - "Rework pendiente: remover Spring AI del orchestrator y reemplazar tools por router local deterministico."
+  - "Phase 8 lista: no quedan referencias a Spring AI, ChatClient, @Tool ni llama3 en el modulo orchestrator-agent."
 questions_for_user: []
 context_health:
   session_id: codex-2026-06-29

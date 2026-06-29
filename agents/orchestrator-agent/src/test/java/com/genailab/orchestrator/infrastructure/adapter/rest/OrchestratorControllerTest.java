@@ -60,16 +60,16 @@ class OrchestratorControllerTest {
   }
 
   @Test
-  void shouldReturnAnswerAndNullRoutedToWhenNoToolWasInvoked() throws Exception {
+  void shouldReturnAnswerAndRoutedToForDefaultRoute() throws Exception {
     when(useCase.orchestrate(any())).thenReturn(
-        new OrchestrationResult("Hola.", null));
+        new OrchestrationResult("Hola.", "smart-search-agent"));
 
     mockMvc.perform(post("/api/v1/ask")
             .contentType("application/json")
             .content("{\"question\":\"Hola\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.answer").value("Hola."))
-        .andExpect(jsonPath("$.routedTo").isEmpty());
+        .andExpect(jsonPath("$.routedTo").value("smart-search-agent"));
   }
 
   @Test

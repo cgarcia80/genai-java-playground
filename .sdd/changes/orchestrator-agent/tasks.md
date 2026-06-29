@@ -99,32 +99,32 @@ Phases MUST be executed in order. Within a phase, tasks MUST be executed in list
 
 ## Phase 8: Router rule-based rework
 
-- [ ] **8.1 Remover dependencia de tool calling del orchestrator**
+- [x] **8.1 Remover dependencia de tool calling del orchestrator**
   - Ref: `agents/orchestrator-agent/pom.xml`, `src/main/resources/application.properties`, `infrastructure/config/SpringAiConfig.java`
   - Implements: D1
   - Done when: el orchestrator no declara Spring AI ni configura modelo LLM propio.
 
-- [ ] **8.2 Crear puerto y adapter de clasificacion local**
+- [x] **8.2 Crear puerto y adapter de clasificacion local**
   - Ref: `domain/port/RoutingClassifier.java`, `infrastructure/adapter/routing/RuleBasedRoutingClassifier.java`
   - Implements: D1, D2, R-Ruteo local deterministico
   - Done when: diagnosis tiene prioridad sobre doc-query y smart-search queda como default.
 
-- [ ] **8.3 Tests de clasificacion local**
+- [x] **8.3 Tests de clasificacion local**
   - Ref: `src/test/.../infrastructure/adapter/routing/RuleBasedRoutingClassifierTest.java`
   - Implements: R-Ruteo local deterministico
   - Done when: cubre pregunta de docs, stacktrace/error/log y pregunta general.
 
-- [ ] **8.4 Reemplazar tools por cliente HTTP downstream**
+- [x] **8.4 Reemplazar tools por cliente HTTP downstream**
   - Ref: `infrastructure/adapter/http/DownstreamAgentClient.java`, `infrastructure/adapter/ai/AgentTools.java`
   - Implements: D3, D4, R-Delegacion HTTP
   - Done when: no quedan `@Tool` ni `ThreadLocal`; el cliente HTTP conserva flatten de respuestas.
 
-- [ ] **8.5 Reemplazar SpringAiOrchestrationAdapter por adapter rule-based**
+- [x] **8.5 Reemplazar SpringAiOrchestrationAdapter por adapter rule-based**
   - Ref: `infrastructure/adapter/orchestration/OrchestrationAdapter.java`, `infrastructure/adapter/ai/SpringAiOrchestrationAdapter.java`
   - Implements: D1, D2, D5
   - Done when: `orchestrate()` clasifica localmente y `invoke()` respeta bypass.
 
-- [ ] **8.6 Actualizar tests de adapter y controller**
+- [x] **8.6 Actualizar tests de adapter y controller**
   - Ref: `src/test/.../infrastructure/adapter/orchestration/*Test.java`, `src/test/.../infrastructure/adapter/rest/OrchestratorControllerTest.java`
   - Implements: R-Contrato API, R-Ruteo local deterministico, R-Bypass
   - Done when: no hay mocks de ChatClient y se prueba routeo normal sin LLM.

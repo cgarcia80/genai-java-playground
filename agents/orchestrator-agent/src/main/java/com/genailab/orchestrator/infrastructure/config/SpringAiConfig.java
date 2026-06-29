@@ -1,7 +1,6 @@
 package com.genailab.orchestrator.infrastructure.config;
 
 import java.time.Duration;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,11 +9,6 @@ import org.springframework.web.client.RestClient;
 
 @Configuration
 public class SpringAiConfig {
-
-  @Bean
-  ChatClient chatClient(ChatClient.Builder builder) {
-    return builder.build();
-  }
 
   @Bean
   @Qualifier("docQueryClient")
