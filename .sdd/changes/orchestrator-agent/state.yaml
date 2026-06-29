@@ -1,6 +1,6 @@
 change: orchestrator-agent
-current_phase: apply
-status: in-progress
+current_phase: tasks
+status: pending-apply
 last_updated: 2026-06-29
 artifacts:
   exploration: null
@@ -13,9 +13,9 @@ artifacts:
 last_result:
   status: blocked
   summary_es: >
-    Ajuste de diseño aplicado: read-timeout local del orchestrator sube a 90s para evitar falsos 502
-    con Ollama/LiteLLM lento durante smoke. Cambio minimo aplicado en application.properties.
-  next_phase_recommended: verify
+    Contrato actualizado a router rule-based local. Proposal, spec, design y tasks quedan alineados:
+    el orchestrator ya no debe usar LLM/tool calling para decidir ruteo.
+  next_phase_recommended: apply
 risks:
   - "Tool calling con llama3 local puede fallar; verify debe bloquear si no invoca tools de forma confiable."
   - "El change no tiene exploration.md historico; se conserva exploration: null para no inventar auditoria retroactiva."
@@ -25,6 +25,8 @@ risks:
   - "[F2] El bypass real a downstream devuelve 502 — location: agents/orchestrator-agent/src/main/java/com/genailab/orchestrator/infrastructure/adapter/ai/AgentTools.java:41 — action: hacer que al menos un bypass real a downstream disponible devuelva HTTP 200 y routedTo correcto, luego repetir smoke."
   - "Re-apply detenido: aumentar read-timeout o cambiar estrategia de smoke requiere actualizar design/tasks antes de codigo."
   - "Re-apply minimo aplicado: repetir verify y smoke E2E con read-timeout=90s."
+  - "Nuevo bloqueo de diseño: ruteo LLM local con llama3 no devuelve respuesta en smoke sin bypass."
+  - "Rework pendiente: remover Spring AI del orchestrator y reemplazar tools por router local deterministico."
 questions_for_user: []
 context_health:
   session_id: codex-2026-06-29

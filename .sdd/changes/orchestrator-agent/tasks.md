@@ -44,19 +44,19 @@ Phases MUST be executed in order. Within a phase, tasks MUST be executed in list
 - [x] **4.1 Crear AppProperties y SpringAiConfig**
   - Ref: `infrastructure/config/AppProperties.java`, `infrastructure/config/SpringAiConfig.java`
   - Implements: D1, D2, D3
-  - Done when: tres `RestClient` dedicados, `ChatClient`, timeouts 5s/90s y sin defaults inline.
+  - Done when: tres `RestClient` dedicados y timeouts 5s/90s sin defaults inline. Nota: `ChatClient` queda supercedido por Phase 8.
 
 - [x] **4.2 Crear application.properties**
   - Ref: `src/main/resources/application.properties`
   - Implements: R-Proteccion retry, D1
-  - Done when: `server.port=8083`, `spring.ai.retry.max-attempts=1`, modelo `llama3`, URLs downstream por env vars y `agents.read-timeout=90s`.
+  - Done when: `server.port=8083`, URLs downstream por env vars y `agents.read-timeout=90s`. Nota: config LLM queda supercedida por Phase 8.
 
 ## Phase 5: AI adapter and tools
 
 - [x] **5.1 Crear AgentTools**
   - Ref: `infrastructure/adapter/ai/AgentTools.java`
   - Implements: D3, D4, D5
-  - Done when: tres `@Tool` con descriptions del spec, HTTP POST correcto, `ThreadLocal` de routed agent y respuestas aplanadas.
+  - Done when: HTTP POST correcto y respuestas aplanadas. Nota: `@Tool` y `ThreadLocal` quedan supercedidos por Phase 8.
 
 - [x] **5.2 Tests de AgentTools**
   - Ref: `src/test/.../infrastructure/adapter/ai/AgentToolsTest.java`
@@ -66,7 +66,7 @@ Phases MUST be executed in order. Within a phase, tasks MUST be executed in list
 - [x] **5.3 Crear SpringAiOrchestrationAdapter**
   - Ref: `infrastructure/adapter/ai/SpringAiOrchestrationAdapter.java`
   - Implements: D1, D5, D6
-  - Done when: `orchestrate()` usa `ChatClient.tools(agentTools)`, `routedTo` null si no hubo tool, `invoke()` llama directo segun target.
+  - Done when: adapter inicial creado. Nota: `ChatClient.tools(...)` queda supercedido por Phase 8.
 
 - [x] **5.4 Tests de SpringAiOrchestrationAdapter**
   - Ref: `src/test/.../infrastructure/adapter/ai/SpringAiOrchestrationAdapterTest.java`
@@ -97,12 +97,44 @@ Phases MUST be executed in order. Within a phase, tasks MUST be executed in list
   - Implements: proposal.md affected areas
   - Done when: service `orchestrator-agent` expone `8083:8083`, depende de los tres downstream y define URLs internas.
 
-## Phase 8: Final validation
+## Phase 8: Router rule-based rework
 
-- [ ] **8.1 Validacion end-to-end contra success criteria**
+- [ ] **8.1 Remover dependencia de tool calling del orchestrator**
+  - Ref: `agents/orchestrator-agent/pom.xml`, `src/main/resources/application.properties`, `infrastructure/config/SpringAiConfig.java`
+  - Implements: D1
+  - Done when: el orchestrator no declara Spring AI ni configura modelo LLM propio.
+
+- [ ] **8.2 Crear puerto y adapter de clasificacion local**
+  - Ref: `domain/port/RoutingClassifier.java`, `infrastructure/adapter/routing/RuleBasedRoutingClassifier.java`
+  - Implements: D1, D2, R-Ruteo local deterministico
+  - Done when: diagnosis tiene prioridad sobre doc-query y smart-search queda como default.
+
+- [ ] **8.3 Tests de clasificacion local**
+  - Ref: `src/test/.../infrastructure/adapter/routing/RuleBasedRoutingClassifierTest.java`
+  - Implements: R-Ruteo local deterministico
+  - Done when: cubre pregunta de docs, stacktrace/error/log y pregunta general.
+
+- [ ] **8.4 Reemplazar tools por cliente HTTP downstream**
+  - Ref: `infrastructure/adapter/http/DownstreamAgentClient.java`, `infrastructure/adapter/ai/AgentTools.java`
+  - Implements: D3, D4, R-Delegacion HTTP
+  - Done when: no quedan `@Tool` ni `ThreadLocal`; el cliente HTTP conserva flatten de respuestas.
+
+- [ ] **8.5 Reemplazar SpringAiOrchestrationAdapter por adapter rule-based**
+  - Ref: `infrastructure/adapter/orchestration/OrchestrationAdapter.java`, `infrastructure/adapter/ai/SpringAiOrchestrationAdapter.java`
+  - Implements: D1, D2, D5
+  - Done when: `orchestrate()` clasifica localmente y `invoke()` respeta bypass.
+
+- [ ] **8.6 Actualizar tests de adapter y controller**
+  - Ref: `src/test/.../infrastructure/adapter/orchestration/*Test.java`, `src/test/.../infrastructure/adapter/rest/OrchestratorControllerTest.java`
+  - Implements: R-Contrato API, R-Ruteo local deterministico, R-Bypass
+  - Done when: no hay mocks de ChatClient y se prueba routeo normal sin LLM.
+
+## Phase 9: Final validation
+
+- [ ] **9.1 Validacion end-to-end contra success criteria**
   - Ref: N/A
   - Implements: proposal.md success criteria
-  - Done when: servicio levanta, ruteos funcionan, bypass funciona, downstream caido devuelve 502 y retry LLM queda en 1.
+  - Done when: servicio levanta, ruteos rule-based funcionan, bypass funciona y downstream caido devuelve 502.
 
 ## References
 

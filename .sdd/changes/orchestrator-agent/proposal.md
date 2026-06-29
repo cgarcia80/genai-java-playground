@@ -1,71 +1,63 @@
 # Proposal: orchestrator-agent
 
-> Updated on 2026-06-29.
-> Status: draft (reused open change, awaiting approval before `sdd-apply`)
+> Updated on 2026-06-29 after runtime verification.
+> Status: draft (reused open change, awaiting controlled re-apply)
 
 ## Intent
 
-Construir el agente 4 del catalogo: `orchestrator-agent`, un punto de entrada unico que recibe preguntas en lenguaje natural y delega a `doc-query-agent`, `diagnosis-agent` o `smart-search-agent` usando Spring AI tool calling. Inaugura el patron multi-agente: las tools del modelo son HTTP calls a otros microservicios, no metodos locales.
+Construir `orchestrator-agent` como punto de entrada unico para delegar preguntas a `doc-query-agent`, `diagnosis-agent` o `smart-search-agent`. Despues de verificar que `llama3` local no responde de forma confiable con tool calling en el router, el ruteo pasa a ser deterministico y local. Los downstream siguen siendo agentes especializados.
 
 ## Scope
 
-- Nuevo servicio Spring Boot 3.x / Java 21 en Docker, expuesto en `:8083`, integrado al `docker-compose.yaml`.
-- Endpoint `POST /api/v1/ask` que recibe `{"question": "..."}` y devuelve `{"answer": "...", "routedTo": "<agent-name>|null"}`.
-- El modelo de ruteo del orchestrator usa `llama3` via LiteLLM, no `gemini-flash`, porque la pregunta completa puede contener documentacion interna, logs o stacktraces sensibles.
-- Tres tools `@Tool` que hacen POST via `RestClient`: `callDocQueryAgent`, `callDiagnosisAgent`, `callSmartSearchAgent`.
-- `callDiagnosisAgent` recibe solo el fragmento de log/stacktrace extraido por el modelo como parametro `logContent` y lo mapea al payload `{"log": "..."}`.
-- `routedTo` lleva el nombre del agente efectivamente invocado. Si el modelo responde sin invocar tool, `routedTo` es `null`.
-- Modo de bypass para desarrollo: header opcional `X-Bypass-Routing` con valores `doc-query`, `diagnosis` o `smart-search`, que saltea el LLM y llama directo al downstream seleccionado. Sirve para probar red/Docker sin gastar requests de tool calling.
+- Servicio Spring Boot 3.x / Java 21 en Docker, expuesto en `:8083`.
+- Endpoint `POST /api/v1/ask` con request `{"question":"..."}` y response `{"answer":"...", "routedTo":"<agent-name>"}`.
+- Router local rule-based:
+  - preguntas con stacktrace, exception o log -> `diagnosis-agent`
+  - preguntas sobre documentacion interna, entidades, arquitectura, procesos o docs -> `doc-query-agent`
+  - resto -> `smart-search-agent`
+- Tres llamadas HTTP sincronicas via `RestClient` a downstream:
+  - `doc-query-agent` -> `/api/v1/query`
+  - `diagnosis-agent` -> `/api/v1/diagnose`
+  - `smart-search-agent` -> `/api/v1/chat`
+- Header opcional `X-Bypass-Routing` (`doc-query`, `diagnosis`, `smart-search`) para forzar el downstream en smoke/dev.
+- Timeouts globales: connect `5s`, read `90s`, adecuados para Ollama/LiteLLM local.
 - Arquitectura hexagonal consistente con los agentes previos.
 
 ## Out of scope
 
-- Composicion/encadenamiento de multiples agentes en una sola pregunta (un request, un agente).
-- Friendly fallback si downstream falla; se devuelve error HTTP estandar.
-- UI / cliente; solo backend REST.
-- Autenticacion de endpoints (queda para change transversal).
-- Caching de respuestas o memoria conversacional.
-- Reintentos automaticos hacia downstream.
-- Timeout configurable por downstream (queda como riesgo conocido para un change posterior).
-- Correccion global de la API key Gemini hardcodeada en `litellm_config.yaml`; queda recomendado como change separado de seguridad.
+- Tool calling en el orchestrator.
+- Clasificacion semantica con LLM cloud.
+- Composicion de multiples agentes por request.
+- UI, autenticacion, cache, memoria conversacional o retries automaticos.
+- Cambios en los agentes downstream.
+- Correccion de la API key Gemini hardcodeada en `litellm_config.yaml`; queda como deuda separada.
 
 ## Affected areas
 
-- Nuevo modulo Maven: `agents/orchestrator-agent/`.
-- `docker-compose.yaml`: nuevo service `orchestrator-agent` con `depends_on` de `doc-query-agent`, `diagnosis-agent`, `smart-search-agent` y `litellm`.
-- Sin cambios obligatorios en `litellm_config.yaml`; el orchestrator usa el alias local `llama3`.
-- Sin cambios en los agentes 1, 2 o 3.
-
-## Capabilities
-
-| Capability | Status | Spec file |
-|-----------|--------|-----------|
-| OrchestratorAgent | NEW | `.sdd/changes/orchestrator-agent/specs/orchestrator-agent/spec.md` |
-
-## Rollback
-
-`docker compose stop orchestrator-agent` o comentar el service en el compose deshabilita el agente sin afectar al resto del stack. `git revert` del commit revierte codigo y compose. No hay estado persistente, no hay migraciones, no hay cambios de contrato en los agentes downstream.
+- `agents/orchestrator-agent/`: ajustar adapter de orquestacion para usar router rule-based y cliente HTTP local.
+- `docker-compose.yaml`: service `orchestrator-agent` ya agregado.
+- Sin cambios requeridos en `litellm_config.yaml`; el orchestrator no consume LLM.
 
 ## Success criteria
 
-- `docker compose up orchestrator-agent` levanta el servicio en `:8083` sin errores.
-- `POST /api/v1/ask` con pregunta sobre documentacion rutea a `doc-query-agent` (`routedTo="doc-query-agent"`) y devuelve respuesta coherente.
-- `POST /api/v1/ask` con stacktrace o log rutea a `diagnosis-agent` con payload `{"log": "..."}`.
-- `POST /api/v1/ask` con pregunta general rutea a `smart-search-agent`.
-- `POST /api/v1/ask` con `X-Bypass-Routing` llama directo al downstream indicado y evita la llamada LLM del orchestrator.
-- Si un downstream devuelve error o no responde, el orchestrator devuelve HTTP 502 sin romperse.
-- `spring.ai.retry.max-attempts=1` configurado.
-- Convenciones del stack (hexagonal, constructor injection, modelo por config, tools con `@Tool` + `ThreadLocal`) se cumplen.
+- `orchestrator-agent` levanta en `:8083`.
+- Pregunta sobre documentacion rutea a `doc-query-agent` y devuelve `routedTo="doc-query-agent"`.
+- Pregunta con stacktrace/log rutea a `diagnosis-agent`.
+- Pregunta general rutea a `smart-search-agent`.
+- `X-Bypass-Routing` llama directo al downstream indicado.
+- Header bypass invalido devuelve HTTP 400.
+- Downstream caido o con error devuelve HTTP 502.
+- Tests unitarios/WebMvc pasan.
+- Smoke E2E demuestra al menos `doc-query` y `smart-search` con HTTP 200.
 
 ## Acknowledged risks
 
-- **Tool calling con modelo local**: `llama3.2:3b` tuvo problemas de tool calling en `smart-search-agent`. Se prioriza privacidad para el orchestrator; si verify demuestra que `llama3` no invoca tools de forma confiable, el change debe bloquear y decidir entre router rule-based local o aceptacion explicita de cloud.
-- **Quota Gemini compartida**: aunque el orchestrator usa local, una pregunta ruteada a `smart-search-agent` puede consumir Gemini en el downstream. El bypass reduce el costo de pruebas de red del orchestrator, no elimina el costo del smart-search.
-- **Mapping de payload diagnosis-agent**: el modelo debe extraer el log del texto libre. Mitigable con descriptions prescriptivas y smoke tests.
-- **Sin timeout granular por downstream**: si un agente queda colgado, el request del orchestrator espera hasta el timeout global del cliente HTTP.
+- El router rule-based es menos flexible que tool calling; nuevas categorias requieren actualizar reglas.
+- `diagnosis-agent` y `doc-query-agent` pueden tardar por Ollama local; por eso el timeout de lectura es 90s.
+- `smart-search-agent` sigue usando Gemini y puede consumir quota, pero eso ocurre en el downstream, no en el router.
 
 ## Recommended Direction
 
-- **Chosen option**: LLM tool calling con tools HTTP, usando `llama3` local para el ruteo del orchestrator y bypass por header para desarrollo.
-- **Why**: mantiene el valor didactico multi-agente sin violar la regla de privacidad del repo. El bypass permite validar integracion sin quemar quota ni depender del comportamiento no deterministico del LLM.
-- **Trade-off accepted**: el tool calling local puede ser menos confiable que Gemini; verify debe probarlo y bloquear si no cumple.
+- **Chosen option**: router rule-based local + HTTP delegation.
+- **Why**: respeta privacidad, evita cuelgues de tool calling local, elimina dependencia de Gemini en el router y permite smoke reproducible.
+- **Trade-off accepted**: el enrutamiento es mas simple y explicito; no intenta interpretar intencion compleja con LLM.
