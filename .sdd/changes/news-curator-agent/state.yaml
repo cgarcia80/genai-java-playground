@@ -1,0 +1,22 @@
+change: news-curator-agent
+current_phase: apply
+status: active
+last_updated: 2026-06-30
+artifacts:
+  proposal: .sdd/changes/news-curator-agent/proposal.md
+  specs:
+    - .sdd/changes/news-curator-agent/specs/news-curator-agent/spec.md
+  design: .sdd/changes/news-curator-agent/design.md
+  tasks: .sdd/changes/news-curator-agent/tasks.md
+  verification: null
+last_result:
+  status: success
+  summary_es: "Código del news-curator-agent implementado y compilado con éxito. Se validó con tests unitarios y de integración en verde."
+  next_phase_recommended: verify
+risks:
+  - "Consumo de rate limit en HackerNews API por múltiples llamadas a historias individuales."
+  - "Latencia de embeddings locales corriendo en CPU."
+questions_for_user: []
+context_health:
+  health_status: green
+  last_checked: 2026-06-30

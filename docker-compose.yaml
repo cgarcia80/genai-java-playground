@@ -112,6 +112,18 @@ services:
       - litellm
     restart: unless-stopped
 
+  news-curator-agent:
+    build:
+      context: ./agents/news-curator-agent
+      dockerfile: Dockerfile
+    container_name: news-curator-agent
+    ports:
+      - "8084:8084"
+    depends_on:
+      - litellm
+      - qdrant
+    restart: unless-stopped
+
   langfuse:
     image: langfuse/langfuse:2
     container_name: langfuse

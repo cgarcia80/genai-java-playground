@@ -17,5 +17,6 @@
         <module>agents/diagnosis-agent</module>
         <module>agents/smart-search-agent</module>
         <module>agents/orchestrator-agent</module>
+        <module>agents/news-curator-agent</module>
     </modules>
 </project>

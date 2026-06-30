@@ -1,0 +1,29 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: news-curator-agent
+  ai:
+    openai:
+      base-url: http://litellm:4000
+      api-key: "no-key-needed"
+      chat:
+        options:
+          model: gpt-4o-mini
+      embedding:
+        options:
+          model: nomic-embed-text
+    vectorstore:
+      qdrant:
+        host: qdrant
+        port: 6334
+        collection-name: news-curator
+        initialize-schema: true
+
+app:
+  hacker-news:
+    algolia-base-url: https://hn.algolia.com/api/v1
+    firebase-base-url: https://hacker-news.firebaseio.com/v0
+    connect-timeout-ms: 5000
+    read-timeout-ms: 10000
