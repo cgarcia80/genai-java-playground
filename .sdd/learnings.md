@@ -1,7 +1,19 @@
 # Learnings — genai-stack
 
 > Documentación de decisiones técnicas, patrones encontrados, y gotchas capturados durante el desarrollo del stack de agentes.
-> Última actualización: 2026-06-29.
+> Última actualización: 2026-06-30.
+
+## 2026-06-30 — news-curator-agent
+
+### Curación y RAG dinámico de noticias
+- **What**: Curador de noticias basado en HackerNews API y RAG con almacenamiento vectorial en colecciones dedicadas de Qdrant.
+- **Why**: Proveer respuestas actualizadas e informadas por eventos recientes sobre tecnologías de interés para el stack de GenAI.
+- **Where**:
+  - `agents/news-curator-agent/src/` (puerto `8084`)
+  - Delta spec: `.sdd/specs/news-curator-agent/spec.md`
+- **Learned**:
+  - **Uso de CompletableFuture para llamadas concurrentes**: El diseño de la API de HackerNews requiere consultar cada ítem de forma individual tras obtener el listado de IDs destacados. El uso de `CompletableFuture` para paralelizar estas llamadas es crítico para mitigar la latencia de red y mejorar la experiencia de usuario durante la fase de curación.
+  - **Potencia del RAG dinámico sobre colecciones dedicadas**: El aislamiento de tópicos y noticias dentro de colecciones vectoriales dedicadas y actualizadas en caliente en Qdrant optimiza los resultados de búsqueda semántica y evita la mezcla de contextos irrelevantes durante la generación.
 
 ## 2026-06-29 — orchestrator-agent (agente 4)
 
